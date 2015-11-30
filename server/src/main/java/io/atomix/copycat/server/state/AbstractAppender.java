@@ -38,12 +38,12 @@ import java.util.Set;
  */
 abstract class AbstractAppender implements AutoCloseable {
   protected final Logger LOGGER = LoggerFactory.getLogger(getClass());
-  protected final ServerStateController<RaftState> controller;
+  protected final ServerStateController controller;
   private final Set<MemberContext> appending = new HashSet<>();
   private final Set<MemberContext> configuring = new HashSet<>();
   private boolean open = true;
 
-  AbstractAppender(ServerStateController<RaftState> controller) {
+  AbstractAppender(ServerStateController controller) {
     this.controller = controller;
   }
 

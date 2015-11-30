@@ -13,38 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package io.atomix.copycat.server.cluster;
+package io.atomix.copycat.server.controller;
 
 import io.atomix.copycat.server.state.ServerContext;
-import io.atomix.copycat.server.controller.ServerStateController;
 
 /**
- * Cluster member type.
+ * Server state controller factory.
  *
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
-public interface MemberType {
+@FunctionalInterface
+public interface ServerStateControllerFactory {
 
   /**
-   * Creates a controller for the member type.
+   * Creates a new server state controller.
    *
-   * @param context The server state context.
-   * @return The member type controller.
+   * @param context The server context.
+   * @return The server state controller.
    */
   ServerStateController createController(ServerContext context);
-
-  /**
-   * Returns a boolean value indicating whether the member is a stateful member.
-   *
-   * @return Indicates whether the member is a stateful member.
-   */
-  boolean isStateful();
-
-  /**
-   * Returns a boolean value indicating whether the member is a voting member.
-   *
-   * @return Indicates whether the member is a voting member.
-   */
-  boolean isVoting();
 
 }

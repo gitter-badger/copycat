@@ -33,13 +33,13 @@ import static org.testng.Assert.*;
  * Candidate state tests.
  */
 @Test
-public class CandidateStateTest extends AbstractStateTest<CandidateState> {
+public class CandidateStateTest extends AbstractStateTest<AbstractCandidateState> {
 
   @BeforeMethod
   @Override
   void beforeMethod() throws Throwable {
     super.beforeMethod();
-    state = new CandidateState(serverState.getController());
+    state = new AbstractCandidateState(serverState.getController());
   }
 
   public void testCandidateAppendAndTransitionOnTerm() throws Throwable {

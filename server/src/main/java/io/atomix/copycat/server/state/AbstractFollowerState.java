@@ -46,17 +46,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-final class FollowerState extends ActiveState {
+public abstract class AbstractFollowerState extends AbstractActiveState {
   private final Random random = new Random();
   private Scheduled heartbeatTimer;
 
-  public FollowerState(ServerStateController controller) {
+  public AbstractFollowerState(ServerStateController controller) {
     super(controller);
-  }
-
-  @Override
-  public Type type() {
-    return RaftStateType.FOLLOWER;
   }
 
   @Override
@@ -205,8 +200,7 @@ final class FollowerState extends ActiveState {
 
     // If there are no other members in the cluster, immediately transition to leader.
     if (votingMembers.isEmpty()) {
-      LOGGER.debug("{} - Single member cluster. Transitioning directly to leader.", controller.context().getCluster().getMember().serverAddress());
-      controller.transition(RaftStateType.LEADER);
+      controller.next();
       return;
     }
 
@@ -214,7 +208,7 @@ final class FollowerState extends ActiveState {
       // If a majority of the cluster indicated they would vote for us then transition to candidate.
       complete.set(true);
       if (elected) {
-        controller.transition(RaftStateType.CANDIDATE);
+        controller.next();
       } else {
         resetHeartbeatTimeout();
       }

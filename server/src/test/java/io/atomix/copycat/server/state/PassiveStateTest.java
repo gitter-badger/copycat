@@ -34,12 +34,12 @@ import static org.testng.Assert.*;
  * Passive state tests.
  */
 @Test
-public class PassiveStateTest extends AbstractStateTest<PassiveState> {
+public class PassiveStateTest extends AbstractStateTest<AbstractPassiveState> {
   @BeforeMethod
   @Override
   void beforeMethod() throws Throwable {
     super.beforeMethod();
-    state = new PassiveState(serverState.getController());
+    state = new AbstractPassiveState(serverState.getController());
   }
 
   public void testAccept() throws Throwable {

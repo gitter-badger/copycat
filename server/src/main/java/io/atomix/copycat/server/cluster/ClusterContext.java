@@ -20,6 +20,7 @@ import io.atomix.copycat.server.state.ServerContext;
 import io.atomix.copycat.server.storage.MetaStore;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -33,7 +34,7 @@ public final class ClusterContext {
   private long version = -1;
   private final Map<Integer, MemberContext> membersMap = new HashMap<>();
   private final List<MemberContext> members = new ArrayList<>();
-  private final Map<MemberType, List<MemberContext>> memberTypes = new HashMap<>();
+  private final Map<Member.Type, List<MemberContext>> memberTypes = new HashMap<>();
 
   public ClusterContext(ServerContext context, Member member) {
     this.context = Assert.notNull(context, "context");
@@ -54,8 +55,8 @@ public final class ClusterContext {
    *
    * @return The remote quorum count.
    */
-  public int getQuorum() {
-    return (int) Math.floor((getVotingMemberStates().size() + 1) / 2.0) + 1;
+  public int getQuorum(Member.Type type) {
+    return (int) Math.floor((getRemoteMemberStates(type).size() + 1) / 2.0) + 1;
   }
 
   /**
@@ -140,51 +141,44 @@ public final class ClusterContext {
   }
 
   /**
-   * Returns a list of voting members.
+   * Returns a list of remote members of the given type.
    *
-   * @return A list of voting members.
+   * @param type The remote member type.
+   * @return A list of remote members of the given type.
    */
-  public List<Member> getVotingMembers() {
-    return members.stream().filter(m -> m.getMember().type() != null && m.getMember().type().isVoting()).map(MemberContext::getMember).collect(Collectors.toList());
+  public List<Member> getRemoteMembers(Member.Type type) {
+    return getRemoteMemberStates(type).stream().map(MemberContext::getMember).collect(Collectors.toList());
   }
 
   /**
-   * Returns a list of voting members.
+   * Returns a list of remote member states of the given type.
    *
-   * @return A list of voting members.
+   * @param type The remote member type.
+   * @return A list of remote member states of the given type.
    */
-  public List<MemberContext> getVotingMemberStates() {
-    return members.stream().filter(m -> m.getMember().type() != null && m.getMember().type().isVoting()).collect(Collectors.toList());
+  public List<MemberContext> getRemoteMemberStates(Member.Type type) {
+    List<MemberContext> memberType = memberTypes.get(type);
+    return memberType != null ? memberType : Collections.EMPTY_LIST;
   }
 
   /**
-   * Returns a list of voting members.
+   * Returns a list of remote members matching the given predicate.
    *
-   * @param comparator A comparator with which to sort the members.
-   * @return A list of voting members.
+   * @param predicate The predicate with which to filter members.
+   * @return A list of remote members matching the given predicate.
    */
-  public List<MemberContext> getVotingMemberStates(Comparator<MemberContext> comparator) {
-    List<MemberContext> members = getVotingMemberStates();
-    Collections.sort(members, comparator);
-    return members;
+  public List<Member> getRemoteMembers(Predicate<Member> predicate) {
+    return getRemoteMemberStates(predicate).stream().map(MemberContext::getMember).collect(Collectors.toList());
   }
 
   /**
-   * Returns a list of stateful members.
+   * Returns a list of remote member states matching the given predicate.
    *
-   * @return A list of stateful members.
+   * @param predicate The predicate with which to filter members.
+   * @return A list of remote member states matching the given predicate.
    */
-  public List<Member> getStatefulMembers() {
-    return members.stream().filter(m -> m.getMember().type() != null && m.getMember().type().isStateful()).map(MemberContext::getMember).collect(Collectors.toList());
-  }
-
-  /**
-   * Returns a list of stateful members.
-   *
-   * @return A list of stateful members.
-   */
-  public List<MemberContext> getStatefulMemberStates() {
-    return members.stream().filter(m -> m.getMember().type() != null && m.getMember().type().isStateful()).collect(Collectors.toList());
+  public List<MemberContext> getRemoteMemberStates(Predicate<Member> predicate) {
+    return members.stream().filter(m -> predicate.test(m.getMember())).collect(Collectors.toList());
   }
 
   /**
@@ -242,7 +236,7 @@ public final class ClusterContext {
 
     // If the local member is not part of the configuration, set its type to null.
     if (!members.contains(this.member)) {
-      this.member.update(RaftMemberType.INACTIVE);
+      this.member.update(CopycatMemberType.INACTIVE);
     }
 
     // Iterate through configured members and remove any that no longer exist in the configuration.

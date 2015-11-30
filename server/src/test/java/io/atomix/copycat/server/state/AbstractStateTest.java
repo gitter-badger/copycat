@@ -29,7 +29,7 @@ import io.atomix.copycat.server.TestStateMachine;
 import io.atomix.copycat.server.Testing.ThrowableRunnable;
 import io.atomix.copycat.server.cluster.ConnectionManager;
 import io.atomix.copycat.server.cluster.Member;
-import io.atomix.copycat.server.cluster.RaftMemberType;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
 import io.atomix.copycat.server.storage.*;
 import io.atomix.copycat.server.storage.entry.Entry;
 import net.jodah.concurrentunit.ConcurrentTestCase;
@@ -150,7 +150,7 @@ public abstract class AbstractStateTest<T extends ServerState> extends Concurren
   private List<Member> createMembers(int nodes) {
     List<Member> members = new ArrayList<>();
     for (int i = 0; i < nodes; i++) {
-      members.add(new Member(RaftMemberType.ACTIVE, new Address("localhost", 5000 + i), new Address("localhost", 6000 + i)));
+      members.add(new Member(CopycatMemberType.ACTIVE, new Address("localhost", 5000 + i), new Address("localhost", 6000 + i)));
     }
     return members;
   }

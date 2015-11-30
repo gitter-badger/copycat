@@ -15,46 +15,50 @@
  */
 package io.atomix.copycat.server.controller;
 
-import io.atomix.copycat.server.cluster.MemberType;
-import io.atomix.copycat.server.cluster.RaftMemberType;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
+import io.atomix.copycat.server.cluster.Member;
 import io.atomix.copycat.server.state.*;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Active state controller.
  *
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
-public class ActiveStateController extends RaftStateController {
+public class ActiveStateController extends ServerStateController {
+  private State state;
+
+  private enum State {
+    FOLLOWER,
+    CANDIDATE,
+    LEADER
+  }
 
   public ActiveStateController(ServerContext context) {
     super(context);
   }
 
   @Override
-  public MemberType type() {
-    return RaftMemberType.ACTIVE;
+  public Member.Type type() {
+    return CopycatMemberType.ACTIVE;
   }
 
   @Override
-  public CompletableFuture<ServerStateController<RaftState>> open() {
-    transition(RaftStateType.FOLLOWER);
-    return super.open();
+  protected ServerState initialState() {
+    this.state = State.FOLLOWER;
+    return new CopycatFollowerState(this);
   }
 
   @Override
-  public void transition(ServerState.Type<RaftState> state) {
-    if (state != RaftStateType.INACTIVE && state != RaftStateType.FOLLOWER && state != RaftStateType.CANDIDATE && state != RaftStateType.LEADER) {
-      throw new IllegalStateException("illegal active member state: " + state);
+  protected ServerState nextState() {
+    if (state == State.FOLLOWER) {
+      state = State.CANDIDATE;
+      return new CopycatCandidateState(this);
+    } else if (state == State.CANDIDATE) {
+      state = State.LEADER;
+      return new CopycatLeaderState(this);
+    } else {
+      throw new IllegalStateException("cannot transition leader state");
     }
-    super.transition(state);
-  }
-
-  @Override
-  public CompletableFuture<Void> close() {
-    transition(RaftStateType.INACTIVE);
-    return super.close();
   }
 
 }

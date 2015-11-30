@@ -15,46 +15,36 @@
  */
 package io.atomix.copycat.server.controller;
 
-import io.atomix.copycat.server.cluster.MemberType;
-import io.atomix.copycat.server.cluster.RaftMemberType;
-import io.atomix.copycat.server.state.*;
-
-import java.util.concurrent.CompletableFuture;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
+import io.atomix.copycat.server.cluster.Member;
+import io.atomix.copycat.server.state.CopycatPassiveState;
+import io.atomix.copycat.server.state.ServerContext;
+import io.atomix.copycat.server.state.ServerState;
 
 /**
  * Passive state controller.
  *
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
-public class PassiveStateController extends RaftStateController {
+public class PassiveStateController extends ServerStateController {
 
   public PassiveStateController(ServerContext context) {
     super(context);
   }
 
   @Override
-  public MemberType type() {
-    return RaftMemberType.PASSIVE;
+  public Member.Type type() {
+    return CopycatMemberType.PASSIVE;
   }
 
   @Override
-  public CompletableFuture<ServerStateController<RaftState>> open() {
-    transition(RaftStateType.PASSIVE);
-    return super.open();
+  protected ServerState initialState() {
+    return new CopycatPassiveState(this);
   }
 
   @Override
-  public void transition(ServerState.Type<RaftState> state) {
-    if (state != RaftStateType.INACTIVE && state != RaftStateType.PASSIVE) {
-      throw new IllegalStateException("illegal passive member state: " + state);
-    }
-    super.transition(state);
-  }
-
-  @Override
-  public CompletableFuture<Void> close() {
-    transition(RaftStateType.INACTIVE);
-    return super.close();
+  protected ServerState nextState() {
+    throw new IllegalStateException("cannot transition passive state");
   }
 
 }

@@ -31,13 +31,13 @@ import static org.testng.Assert.*;
  * Active state tests.
  */
 @Test
-public class ActiveStateTest extends AbstractStateTest<ActiveState> {
+public class ActiveStateTest extends AbstractStateTest<AbstractActiveState> {
 
   @BeforeMethod
   @Override
   void beforeMethod() throws Throwable {
     super.beforeMethod();
-    state = new ActiveState(serverState.getController()) {
+    state = new AbstractActiveState(serverState.getController()) {
     };
   }
 

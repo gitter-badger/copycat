@@ -21,6 +21,7 @@ import io.atomix.catalyst.serializer.CatalystSerializable;
 import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.catalyst.util.Assert;
+import io.atomix.copycat.server.controller.ServerStateControllerFactory;
 
 /**
  * Cluster member.
@@ -28,10 +29,31 @@ import io.atomix.catalyst.util.Assert;
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
 public final class Member implements CatalystSerializable {
-  private MemberType type;
+  private Type type;
   private Status status = Status.AVAILABLE;
   private Address serverAddress;
   private Address clientAddress;
+
+  /**
+   * Member type.
+   */
+  public interface Type {
+
+    /**
+     * Returns the member type ID.
+     *
+     * @return The member type ID.
+     */
+    int id();
+
+    /**
+     * Returns the member type controller factory.
+     *
+     * @return The member type controller factory.
+     */
+    ServerStateControllerFactory factory();
+
+  }
 
   /**
    * Member status.
@@ -53,7 +75,7 @@ public final class Member implements CatalystSerializable {
   Member() {
   }
 
-  public Member(MemberType type, Address serverAddress, Address clientAddress) {
+  public Member(Type type, Address serverAddress, Address clientAddress) {
     this.type = Assert.notNull(type, "type");
     this.serverAddress = Assert.notNull(serverAddress, "serverAddress");
     this.clientAddress = clientAddress;
@@ -73,7 +95,7 @@ public final class Member implements CatalystSerializable {
    *
    * @return The member type.
    */
-  public MemberType type() {
+  public Type type() {
     return type;
   }
 
@@ -110,7 +132,7 @@ public final class Member implements CatalystSerializable {
    * @param type The member type.
    * @return The member.
    */
-  public Member update(MemberType type) {
+  public Member update(Type type) {
     this.type = Assert.notNull(type, "type");
     return this;
   }

@@ -30,15 +30,10 @@ import java.util.concurrent.CompletableFuture;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-class InactiveState extends RaftState {
+public abstract class AbstractInactiveState extends ServerState {
 
-  public InactiveState(ServerStateController controller) {
+  public AbstractInactiveState(ServerStateController controller) {
     super(controller);
-  }
-
-  @Override
-  public Type type() {
-    return RaftStateType.INACTIVE;
   }
 
   @Override

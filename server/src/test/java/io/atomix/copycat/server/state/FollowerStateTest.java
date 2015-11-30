@@ -30,12 +30,12 @@ import io.atomix.copycat.server.response.VoteResponse;
  * Follower state test.
  */
 @Test
-public class FollowerStateTest extends AbstractStateTest<FollowerState> {
+public class FollowerStateTest extends AbstractStateTest<AbstractFollowerState> {
   @BeforeMethod
   @Override
   void beforeMethod() throws Throwable {
     super.beforeMethod();
-    state = new FollowerState(serverState.getController());
+    state = new AbstractFollowerState(serverState.getController());
   }
 
   /**

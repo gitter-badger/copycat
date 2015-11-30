@@ -30,9 +30,12 @@ import io.atomix.catalyst.util.concurrent.ThreadContext;
 import io.atomix.copycat.client.Command;
 import io.atomix.copycat.client.Query;
 import io.atomix.copycat.server.cluster.ConnectionManager;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
 import io.atomix.copycat.server.cluster.Member;
-import io.atomix.copycat.server.cluster.RaftMemberType;
 import io.atomix.copycat.server.state.ServerContext;
+import io.atomix.copycat.server.state.ServerState;
+import io.atomix.copycat.server.state.ServerType;
+import io.atomix.copycat.server.state.StateModel;
 import io.atomix.copycat.server.storage.Log;
 import io.atomix.copycat.server.storage.MetaStore;
 import io.atomix.copycat.server.storage.Storage;
@@ -195,6 +198,85 @@ public class CopycatServer implements Managed<CopycatServer> {
     return new Builder(clientAddress, serverAddress, cluster);
   }
 
+  /**
+   * Copycat server type.
+   */
+  public enum Type implements ServerType {
+
+    /**
+     * Inactive Copycat server type.
+     */
+    INACTIVE {
+      private final StateModel model = StateModel.builder()
+        .withInitialState(State.INACTIVE)
+        .build();
+
+      @Override
+      public int id() {
+        return 0;
+      }
+
+      @Override
+      public StateModel model() {
+        return model;
+      }
+    },
+
+    /**
+     * Passive Copycat server type.
+     */
+    PASSIVE {
+      private final StateModel model = StateModel.builder()
+        .withInitialState(State.INACTIVE)
+        .withNextState(State.PASSIVE)
+        .build();
+
+      @Override
+      public int id() {
+        return 1;
+      }
+
+      @Override
+      public StateModel model() {
+        return model;
+      }
+    },
+
+    /**
+     * Active Copycat server type.
+     */
+    ACTIVE {
+      private final StateModel model = StateModel.builder()
+        .withInitialState(State.INACTIVE)
+        .withNextState(State.FOLLOWER)
+        .withNextState(State.CANDIDATE)
+        .withNextState(State.LEADER)
+        .build();
+
+      @Override
+      public int id() {
+        return 2;
+      }
+
+      @Override
+      public StateModel model() {
+        return model;
+      }
+    }
+
+  }
+
+  /**
+   * Copycat server state.
+   */
+  public enum State implements ServerState.Type {
+    INACTIVE,
+    PASSIVE,
+    FOLLOWER,
+    CANDIDATE,
+    LEADER
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CopycatServer.class);
   private final Address clientAddress;
   private final Address serverAddress;
@@ -229,12 +311,6 @@ public class CopycatServer implements Managed<CopycatServer> {
 
     storage.serializer().resolve(new ServiceLoaderTypeResolver());
     serializer.resolve(new ServiceLoaderTypeResolver());
-  }
-
-  /**
-   * Server state.
-   */
-  public interface State {
   }
 
   /**
@@ -406,7 +482,7 @@ public class CopycatServer implements Managed<CopycatServer> {
 
       internalServer.listen(serverAddress, c -> state.connectServer(c)).whenComplete((internalResult, internalError) -> {
         if (internalError == null) {
-          state = new ServerContext(new Member(RaftMemberType.INACTIVE, serverAddress, clientAddress), members, meta, log, stateMachine, connections, context)
+          state = new ServerContext(new Member(CopycatMemberType.INACTIVE, serverAddress, clientAddress), members, meta, log, stateMachine, connections, context)
             .setElectionTimeout(electionTimeout)
             .setHeartbeatInterval(heartbeatInterval)
             .setSessionTimeout(sessionTimeout);

@@ -28,14 +28,14 @@ import org.testng.annotations.Test;
  * Leader state test.
  */
 @Test
-public class LeaderStateTest extends AbstractStateTest<LeaderState> {
-  LeaderState state;
+public class LeaderStateTest extends AbstractStateTest<AbstractLeaderState> {
+  AbstractLeaderState state;
 
   @BeforeMethod
   @Override
   void beforeMethod() throws Throwable {
     super.beforeMethod();
-    state = new LeaderState(serverState.getController());
+    state = new AbstractLeaderState(serverState.getController());
   }
 
   /**

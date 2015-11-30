@@ -55,12 +55,13 @@ import java.util.stream.Collectors;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-public class ServerContext implements AutoCloseable {
+public abstract class ServerContext implements AutoCloseable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerContext.class);
   private static final int MAX_JOIN_ATTEMPTS = 3;
   private final Listeners<CopycatServer.State> stateChangeListeners = new Listeners<>();
   private final Listeners<Address> electionListeners = new Listeners<>();
   private ThreadContext threadContext;
+  private final ServerModel model;
   private final ClusterContext cluster;
   private final MetaStore meta;
   private final Log log;
@@ -81,7 +82,8 @@ public class ServerContext implements AutoCloseable {
   private long commitIndex;
   private long globalIndex;
 
-  public ServerContext(Member member, Collection<Address> members, MetaStore meta, Log log, StateMachine stateMachine, ConnectionManager connections, ThreadContext threadContext) {
+  protected ServerContext(ServerModel model, Member member, Collection<Address> members, MetaStore meta, Log log, StateMachine stateMachine, ConnectionManager connections, ThreadContext threadContext) {
+    this.model = Assert.notNull(model, "model");
     this.cluster = new ClusterContext(this, member);
     this.meta = Assert.notNull(meta, "meta");
     this.log = Assert.notNull(log, "log");
@@ -101,11 +103,11 @@ public class ServerContext implements AutoCloseable {
     if (configuration != null) {
       cluster.configure(configuration.version(), configuration.members());
     } else if (members.contains(member.serverAddress())) {
-      Set<Member> activeMembers = members.stream().filter(m -> !m.equals(member.serverAddress())).map(m -> new Member(RaftMemberType.ACTIVE, m, null)).collect(Collectors.toSet());
-      activeMembers.add(new Member(RaftMemberType.ACTIVE, member.serverAddress(), member.clientAddress()));
+      Set<Member> activeMembers = members.stream().filter(m -> !m.equals(member.serverAddress())).map(m -> new Member(CopycatMemberType.ACTIVE, m, null)).collect(Collectors.toSet());
+      activeMembers.add(new Member(CopycatMemberType.ACTIVE, member.serverAddress(), member.clientAddress()));
       cluster.configure(0, activeMembers);
     } else {
-      Set<Member> activeMembers = members.stream().map(m -> new Member(RaftMemberType.ACTIVE, m, null)).collect(Collectors.toSet());
+      Set<Member> activeMembers = members.stream().map(m -> new Member(CopycatMemberType.ACTIVE, m, null)).collect(Collectors.toSet());
       cluster.configure(0, activeMembers);
     }
   }
@@ -144,7 +146,7 @@ public class ServerContext implements AutoCloseable {
    *
    * @return The current server state controller.
    */
-  public ServerStateController<?> getController() {
+  public ServerStateController getController() {
     return controller;
   }
 
@@ -396,7 +398,7 @@ public class ServerContext implements AutoCloseable {
    *
    * @return The current member type.
    */
-  public MemberType getType() {
+  public Member.Type getType() {
     return controller.type();
   }
 
@@ -405,7 +407,7 @@ public class ServerContext implements AutoCloseable {
    *
    * @return The current state.
    */
-  public CopycatServer.State getState() {
+  public ServerState.Type getState() {
     return controller.state().type();
   }
 
@@ -470,7 +472,7 @@ public class ServerContext implements AutoCloseable {
   /**
    * Configures the server controller.
    */
-  public void configure(MemberType type) {
+  public void configure(Member.Type type) {
     checkThread();
 
     // If the member type has not changed, return.
@@ -492,7 +494,7 @@ public class ServerContext implements AutoCloseable {
     }
 
     // Force controller transitions to occur synchronously in order to prevent race conditions.
-    controller = type.createController(this);
+    controller = type.factory().createController(this);
     serverConnections.forEach(controller::connectServer);
     clientConnections.forEach(controller::connectClient);
 
@@ -519,7 +521,7 @@ public class ServerContext implements AutoCloseable {
     if (cluster.getMember().type() != null) {
       configure(cluster.getMember().type());
     } else {
-      join(cluster.getVotingMemberStates().iterator(), 1);
+      join(cluster.getRemoteMemberStates().iterator(), 1);
     }
 
     return joinFuture.whenComplete((result, error) -> joinFuture = null);
@@ -550,7 +552,7 @@ public class ServerContext implements AutoCloseable {
             cancelJoinTimer();
 
             // If the local member type is null, that indicates it's not a part of the configuration.
-            MemberType type = cluster.getMember().type();
+            Member.Type type = cluster.getMember().type();
             if (type == null) {
               joinFuture.completeExceptionally(new IllegalStateException("not a member of the cluster"));
             } else {
@@ -564,7 +566,7 @@ public class ServerContext implements AutoCloseable {
             LOGGER.debug("{} - Failed to join {}", cluster.getMember().serverAddress(), member.getMember().serverAddress());
             cancelJoinTimer();
             joinTimer = threadContext.schedule(electionTimeout, () -> {
-              join(cluster.getVotingMemberStates().iterator(), attempts);
+              join(cluster.getRemoteMemberStates().iterator(), attempts);
             });
           } else {
             // If the response error was non-null, attempt to join via the next server in the members list.
@@ -586,7 +588,7 @@ public class ServerContext implements AutoCloseable {
     else {
       cancelJoinTimer();
       joinTimer = threadContext.schedule(electionTimeout.multipliedBy(2), () -> {
-        join(cluster.getVotingMemberStates().iterator(), attempts + 1);
+        join(cluster.getRemoteMemberStates().iterator(), attempts + 1);
       });
     }
   }
@@ -608,14 +610,23 @@ public class ServerContext implements AutoCloseable {
   private void joinLeader(Member leader) {
     if (joinFuture != null) {
       if (cluster.getMember().equals(leader)) {
-        if (controller.state().type() == RaftStateType.LEADER && !((LeaderState) controller.state()).configuring()) {
-          joinFuture.complete(null);
-        } else {
-          cancelJoinTimer();
-          joinTimer = threadContext.schedule(electionTimeout.multipliedBy(2), () -> {
-            joinLeader(leader);
-          });
-        }
+        JoinRequest request = JoinRequest.builder()
+          .withMember(cluster.getMember())
+          .build();
+        controller.state().join(request).whenComplete((response, error) -> {
+          if (error == null) {
+            if (response.status() == Response.Status.OK) {
+              cancelJoinTimer();
+              if (joinFuture != null)
+                joinFuture.complete(null);
+            } else if (response.error() == null) {
+              cancelJoinTimer();
+              joinTimer = threadContext.schedule(electionTimeout.multipliedBy(2), () -> {
+                joinLeader(leader);
+              });
+            }
+          }
+        });
       } else {
         LOGGER.debug("{} - Sending server identification to {}", cluster.getMember().serverAddress(), leader.serverAddress());
         connections.getConnection(leader.serverAddress()).thenCompose(connection -> {
@@ -647,9 +658,9 @@ public class ServerContext implements AutoCloseable {
   public CompletableFuture<Void> leave() {
     CompletableFuture<Void> future = new CompletableFuture<>();
     threadContext.execute(() -> {
-      if (cluster.getVotingMemberStates().isEmpty()) {
+      if (cluster.getRemoteMemberStates().isEmpty()) {
         LOGGER.debug("{} - Single member cluster. Transitioning directly to inactive.", cluster.getMember().serverAddress());
-        configure(RaftMemberType.INACTIVE);
+        configure(CopycatMemberType.INACTIVE);
         future.complete(null);
       } else {
         leave(future);
@@ -676,7 +687,7 @@ public class ServerContext implements AutoCloseable {
       if (error == null && response.status() == Response.Status.OK) {
         cancelLeaveTimer();
         cluster.configure(response.version(), response.members());
-        configure(RaftMemberType.INACTIVE);
+        configure(CopycatMemberType.INACTIVE);
         future.complete(null);
       }
     });
@@ -695,7 +706,7 @@ public class ServerContext implements AutoCloseable {
 
   @Override
   public void close() {
-    configure(RaftMemberType.INACTIVE);
+    configure(CopycatMemberType.INACTIVE);
     stateMachine.close();
     try {
       log.close();

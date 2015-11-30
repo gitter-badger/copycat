@@ -19,7 +19,7 @@ import io.atomix.catalyst.serializer.Serializer;
 import io.atomix.catalyst.serializer.ServiceLoaderTypeResolver;
 import io.atomix.catalyst.transport.Address;
 import io.atomix.copycat.server.cluster.Member;
-import io.atomix.copycat.server.cluster.RaftMemberType;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -37,8 +37,8 @@ public class MemberTest {
    * Tests member getters.
    */
   public void testMemberGetters() {
-    Member member = new Member(RaftMemberType.ACTIVE, new Address("localhost", 5000), new Address("localhost", 6000));
-    assertEquals(member.type(), RaftMemberType.ACTIVE);
+    Member member = new Member(CopycatMemberType.ACTIVE, new Address("localhost", 5000), new Address("localhost", 6000));
+    assertEquals(member.type(), CopycatMemberType.ACTIVE);
     assertEquals(member.status(), Member.Status.AVAILABLE);
     assertEquals(member.serverAddress(), new Address("localhost", 5000));
     assertEquals(member.clientAddress(), new Address("localhost", 6000));
@@ -48,7 +48,7 @@ public class MemberTest {
    * Tests serializing and deserializing a member.
    */
   public void testSerializeDeserialize() {
-    Member member = new Member(RaftMemberType.ACTIVE, new Address("localhost", 5000), null);
+    Member member = new Member(CopycatMemberType.ACTIVE, new Address("localhost", 5000), null);
     Serializer serializer = new Serializer(new ServiceLoaderTypeResolver());
     Member result = serializer.readObject(serializer.writeObject(member).flip());
     assertEquals(result.type(), member.type());
@@ -58,9 +58,9 @@ public class MemberTest {
    * Tests updating a member.
    */
   public void testMemberUpdate() {
-    Member member = new Member(RaftMemberType.ACTIVE, new Address("localhost", 5000), null);
-    member.update(RaftMemberType.INACTIVE);
-    assertEquals(member.type(), RaftMemberType.INACTIVE);
+    Member member = new Member(CopycatMemberType.ACTIVE, new Address("localhost", 5000), null);
+    member.update(CopycatMemberType.INACTIVE);
+    assertEquals(member.type(), CopycatMemberType.INACTIVE);
     member.update(Member.Status.UNAVAILABLE);
     assertEquals(member.status(), Member.Status.UNAVAILABLE);
     assertNull(member.clientAddress());

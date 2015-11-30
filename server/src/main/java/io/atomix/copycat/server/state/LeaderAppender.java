@@ -18,9 +18,9 @@ package io.atomix.copycat.server.state;
 import io.atomix.catalyst.util.Assert;
 import io.atomix.copycat.client.error.InternalException;
 import io.atomix.copycat.client.response.Response;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
 import io.atomix.copycat.server.cluster.Member;
 import io.atomix.copycat.server.cluster.MemberContext;
-import io.atomix.copycat.server.cluster.RaftMemberType;
 import io.atomix.copycat.server.request.AppendRequest;
 import io.atomix.copycat.server.response.AppendResponse;
 import io.atomix.copycat.server.storage.entry.Entry;
@@ -38,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
  */
 final class LeaderAppender extends AbstractAppender {
   private static final int MAX_BATCH_SIZE = 1024 * 32;
-  private final LeaderState leader;
+  private final AbstractLeaderState leader;
   private final long leaderTime;
   private final long leaderIndex;
   private long commitTime;
@@ -47,7 +47,7 @@ final class LeaderAppender extends AbstractAppender {
   private CompletableFuture<Long> nextCommitFuture;
   private final Map<Long, CompletableFuture<Long>> commitFutures = new HashMap<>();
 
-  LeaderAppender(LeaderState leader) {
+  LeaderAppender(AbstractLeaderState leader) {
     super(leader.controller);
     this.leader = Assert.notNull(leader, "leader");
     this.leaderTime = System.currentTimeMillis();
@@ -405,7 +405,7 @@ final class LeaderAppender extends AbstractAppender {
     // If we've received a greater term, update the term and transition back to follower.
     else if (response.term() > controller.context().getTerm()) {
       controller.context().setTerm(response.term()).setLeader(0);
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     }
     // If the response failed, the follower should have provided the correct last index in their log. This helps
     // us converge on the matchIndex faster than by simply decrementing nextIndex one index at a time.
@@ -428,7 +428,7 @@ final class LeaderAppender extends AbstractAppender {
     if (response.term() > controller.context().getTerm()) {
       LOGGER.debug("{} - Received higher term from {}", controller.context().getCluster().getMember().serverAddress(), member.getMember().serverAddress());
       controller.context().setTerm(response.term()).setLeader(0);
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     } else {
       // If any other error occurred, increment the failure count for the member. Log the first three failures,
       // and thereafter log 1% of the failures. This keeps the log from filling up with annoying error messages
@@ -477,7 +477,7 @@ final class LeaderAppender extends AbstractAppender {
     if (System.currentTimeMillis() - Math.max(commitTime(), leaderTime) > controller.context().getElectionTimeout().toMillis() * 2) {
       LOGGER.warn("{} - Suspected network partition. Stepping down", controller.context().getCluster().getMember().serverAddress());
       controller.context().setLeader(0);
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     }
     // If the number of failures has increased above 3 and the member hasn't been marked as UNAVAILABLE, do so.
     else if (failures >= 3) {
@@ -493,8 +493,8 @@ final class LeaderAppender extends AbstractAppender {
    * Updates the cluster configuration for the given member.
    */
   private void updateConfiguration(MemberContext member) {
-    if (member.getMember().type() == RaftMemberType.PASSIVE && !leader.configuring() && member.getMatchIndex() >= controller.context().getCommitIndex()) {
-      member.getMember().update(RaftMemberType.ACTIVE);
+    if (member.getMember().type() == CopycatMemberType.PASSIVE && !leader.configuring() && member.getMatchIndex() >= controller.context().getCommitIndex()) {
+      member.getMember().update(CopycatMemberType.ACTIVE);
       leader.configure(controller.context().getCluster().getMembers());
     }
   }

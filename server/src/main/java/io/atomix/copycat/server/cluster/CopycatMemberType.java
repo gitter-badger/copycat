@@ -18,53 +18,27 @@ package io.atomix.copycat.server.cluster;
 import io.atomix.copycat.server.controller.ActiveStateController;
 import io.atomix.copycat.server.controller.InactiveStateController;
 import io.atomix.copycat.server.controller.PassiveStateController;
-import io.atomix.copycat.server.controller.ServerStateController;
-import io.atomix.copycat.server.state.ServerContext;
+import io.atomix.copycat.server.controller.ServerStateControllerFactory;
 
 /**
- * Raft member types.
+ * Copycat member types.
  *
  * @author <a href="http://github.com/kuujo>Jordan Halterman</a>
  */
-public enum RaftMemberType implements MemberType {
+public enum CopycatMemberType implements Member.Type {
 
   /**
    * Inactive member type.
    */
   INACTIVE {
     @Override
-    public ServerStateController createController(ServerContext context) {
-      return new InactiveStateController(context);
+    public int id() {
+      return 0;
     }
 
     @Override
-    public boolean isStateful() {
-      return false;
-    }
-
-    @Override
-    public boolean isVoting() {
-      return false;
-    }
-  },
-
-  /**
-   * Active member type.
-   */
-  ACTIVE {
-    @Override
-    public ServerStateController createController(ServerContext context) {
-      return new ActiveStateController(context);
-    }
-
-    @Override
-    public boolean isStateful() {
-      return true;
-    }
-
-    @Override
-    public boolean isVoting() {
-      return true;
+    public ServerStateControllerFactory factory() {
+      return InactiveStateController::new;
     }
   },
 
@@ -73,18 +47,28 @@ public enum RaftMemberType implements MemberType {
    */
   PASSIVE {
     @Override
-    public ServerStateController createController(ServerContext context) {
-      return new PassiveStateController(context);
+    public int id() {
+      return 0;
     }
 
     @Override
-    public boolean isStateful() {
-      return true;
+    public ServerStateControllerFactory factory() {
+      return PassiveStateController::new;
+    }
+  },
+
+  /**
+   * Active member type.
+   */
+  ACTIVE {
+    @Override
+    public int id() {
+      return 0;
     }
 
     @Override
-    public boolean isVoting() {
-      return false;
+    public ServerStateControllerFactory factory() {
+      return ActiveStateController::new;
     }
   }
 

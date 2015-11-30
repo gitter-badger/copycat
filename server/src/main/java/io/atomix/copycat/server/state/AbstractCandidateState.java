@@ -38,18 +38,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-final class CandidateState extends ActiveState {
+public abstract class AbstractCandidateState extends AbstractActiveState {
   private final Random random = new Random();
   private Quorum quorum;
   private Scheduled currentTimer;
 
-  public CandidateState(ServerStateController controller) {
+  public AbstractCandidateState(ServerStateController controller) {
     super(controller);
-  }
-
-  @Override
-  public Type type() {
-    return RaftStateType.CANDIDATE;
   }
 
   @Override
@@ -103,7 +98,7 @@ final class CandidateState extends ActiveState {
     // If there are no other members in the cluster, immediately transition to leader.
     if (votingMembers.isEmpty()) {
       LOGGER.debug("{} - Single member cluster. Transitioning directly to leader.", controller.context().getCluster().getMember().serverAddress());
-      controller.transition(RaftStateType.LEADER);
+      controller.next();
       return;
     }
 
@@ -114,9 +109,9 @@ final class CandidateState extends ActiveState {
     final Quorum quorum = new Quorum(controller.context().getCluster().getQuorum(), (elected) -> {
       complete.set(true);
       if (elected) {
-        controller.transition(RaftStateType.LEADER);
+        controller.next();
       } else {
-        controller.transition(RaftStateType.FOLLOWER);
+        controller.reset();
       }
     });
 
@@ -158,7 +153,7 @@ final class CandidateState extends ActiveState {
                 LOGGER.debug("{} - Received greater term from {}", controller.context().getCluster().getMember().serverAddress(), member);
                 controller.context().setTerm(response.term());
                 complete.set(true);
-                controller.transition(RaftStateType.FOLLOWER);
+                controller.reset();
               } else if (!response.voted()) {
                 LOGGER.debug("{} - Received rejected vote from {}", controller.context().getCluster().getMember().serverAddress(), member);
                 quorum.fail();
@@ -184,7 +179,7 @@ final class CandidateState extends ActiveState {
     // assign that term and leader to the current context and step down as a candidate.
     if (request.term() >= controller.context().getTerm()) {
       controller.context().setTerm(request.term());
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     }
     return super.append(request);
   }
@@ -197,7 +192,7 @@ final class CandidateState extends ActiveState {
     // assign that term and leader to the current context and step down as a candidate.
     if (request.term() > controller.context().getTerm()) {
       controller.context().setTerm(request.term());
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
       return super.vote(request);
     }
 

@@ -19,7 +19,7 @@ import io.atomix.catalyst.transport.Connection;
 import io.atomix.copycat.client.error.RaftError;
 import io.atomix.copycat.client.request.*;
 import io.atomix.copycat.client.response.*;
-import io.atomix.copycat.server.cluster.MemberType;
+import io.atomix.copycat.server.cluster.Member;
 import io.atomix.copycat.server.controller.ServerStateController;
 import io.atomix.copycat.server.request.*;
 import io.atomix.copycat.server.response.*;
@@ -37,16 +37,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-class PassiveState extends RaftState {
+public abstract class AbstractPassiveState extends ServerState {
   private final Queue<AtomicInteger> counterPool = new ArrayDeque<>();
 
-  public PassiveState(ServerStateController controller) {
+  public AbstractPassiveState(ServerStateController controller) {
     super(controller);
-  }
-
-  @Override
-  public Type type() {
-    return RaftStateType.PASSIVE;
   }
 
   @Override
@@ -401,7 +396,7 @@ class PassiveState extends RaftState {
     }
 
     // Store the previous member type for comparison to determine whether this node should transition.
-    MemberType previousType = controller.context().getCluster().getMember().type();
+    Member.Type previousType = controller.context().getCluster().getMember().type();
 
     // Configure the cluster membership.
     controller.context().getCluster().configure(request.version(), request.members());
@@ -409,7 +404,7 @@ class PassiveState extends RaftState {
     // If the local member type changed, transition the state as appropriate.
     // ACTIVE servers are initialized to the FOLLOWER state but may transition to CANDIDATE or LEADER.
     // PASSIVE servers are transitioned to the PASSIVE state.
-    MemberType type = controller.context().getCluster().getMember().type();
+    Member.Type type = controller.context().getCluster().getMember().type();
     if (previousType != type) {
       controller.context().configure(type);
     }

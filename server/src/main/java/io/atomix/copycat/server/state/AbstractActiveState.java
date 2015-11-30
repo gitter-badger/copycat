@@ -41,9 +41,9 @@ import java.util.stream.Collectors;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-abstract class ActiveState extends PassiveState {
+public abstract class AbstractActiveState extends AbstractPassiveState {
 
-  protected ActiveState(ServerStateController controller) {
+  protected AbstractActiveState(ServerStateController controller) {
     super(controller);
   }
 
@@ -65,7 +65,7 @@ abstract class ActiveState extends PassiveState {
     // If a transition is required then transition back to the follower state.
     // If the node is already a follower then the transition will be ignored.
     if (transition) {
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     }
     return future;
   }
@@ -126,7 +126,7 @@ abstract class ActiveState extends PassiveState {
 
     CompletableFuture<VoteResponse> future = CompletableFuture.completedFuture(logResponse(handleVote(logRequest(request))));
     if (transition) {
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
     }
     return future;
   }

@@ -25,8 +25,8 @@ import io.atomix.copycat.client.error.RaftException;
 import io.atomix.copycat.client.request.*;
 import io.atomix.copycat.client.response.*;
 import io.atomix.copycat.client.session.Session;
+import io.atomix.copycat.server.cluster.CopycatMemberType;
 import io.atomix.copycat.server.cluster.Member;
-import io.atomix.copycat.server.cluster.RaftMemberType;
 import io.atomix.copycat.server.controller.ServerStateController;
 import io.atomix.copycat.server.request.*;
 import io.atomix.copycat.server.response.*;
@@ -43,19 +43,14 @@ import java.util.stream.Collectors;
  *
  * @author <a href="http://github.com/kuujo">Jordan Halterman</a>
  */
-final class LeaderState extends ActiveState {
+public abstract class AbstractLeaderState extends AbstractActiveState {
   private final LeaderAppender appender;
   private Scheduled appendTimer;
   private long configuring;
 
-  public LeaderState(ServerStateController controller) {
+  public AbstractLeaderState(ServerStateController controller) {
     super(controller);
     this.appender = new LeaderAppender(this);
-  }
-
-  @Override
-  public Type type() {
-    return RaftStateType.LEADER;
   }
 
   @Override
@@ -119,7 +114,7 @@ final class LeaderState extends ActiveState {
           future.complete(null);
         } else {
           controller.context().setLeader(0);
-          controller.transition(RaftStateType.FOLLOWER);
+          controller.reset();
         }
       }
     });
@@ -292,7 +287,7 @@ final class LeaderState extends ActiveState {
 
     // If the member is a joining member, set its type to passive.
     if (member.type() == null) {
-      member.update(RaftMemberType.PASSIVE);
+      member.update(CopycatMemberType.PASSIVE);
     }
 
     Collection<Member> members = controller.context().getCluster().getMembers();
@@ -388,7 +383,7 @@ final class LeaderState extends ActiveState {
     if (request.term() > controller.context().getTerm()) {
       LOGGER.debug("{} - Received greater term", controller.context().getCluster().getMember().serverAddress());
       controller.context().setLeader(0);
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
       return super.vote(request);
     } else {
       return CompletableFuture.completedFuture(logResponse(VoteResponse.builder()
@@ -413,7 +408,7 @@ final class LeaderState extends ActiveState {
         .build()));
     } else {
       controller.context().setLeader(request.leader());
-      controller.transition(RaftStateType.FOLLOWER);
+      controller.reset();
       return super.append(request);
     }
   }
